@@ -7,11 +7,21 @@ import '../models/task.dart';
 class StorageService {
   static const String _projectsKey = 'orion_projects';
   static const String _tasksKey = 'orion_tasks';
+  static const String _isLoggedInKey = 'orion_is_logged_in';
+  static const String _userEmailKey = 'orion_user_email';
 
   final SharedPreferences _prefs;
   final Uuid _uuid = const Uuid();
 
   StorageService(this._prefs);
+
+  bool get isLoggedIn => _prefs.getBool(_isLoggedInKey) ?? false;
+  String get currentUserEmail => _prefs.getString(_userEmailKey) ?? '';
+
+  Future<void> setLoggedIn(bool value, {String email = ''}) async {
+    await _prefs.setBool(_isLoggedInKey, value);
+    await _prefs.setString(_userEmailKey, email);
+  }
 
   static Future<StorageService> init() async {
     final prefs = await SharedPreferences.getInstance();

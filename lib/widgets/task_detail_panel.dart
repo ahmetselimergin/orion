@@ -115,6 +115,44 @@ class _TaskDetailPanelState extends State<TaskDetailPanel> {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                // Parent Task Banner (If task is a subtask)
+                if (widget.task.isSubtask) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.violet.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.violet.withValues(alpha: 0.4)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Remix.corner_down_right_line, size: 16, color: AppColors.violet),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Ana Görev: ${widget.task.parentKey ?? ""}',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.violet),
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () {
+                            final parent = provider.currentProjectTasks.firstWhere(
+                              (t) => t.id == widget.task.parentId,
+                              orElse: () => widget.task,
+                            );
+                            provider.selectTask(parent);
+                          },
+                          child: const Text(
+                            'Ana Göreve Git ➔',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
+
                 // Title Field
                 TextField(
                   controller: _titleController,
@@ -151,7 +189,8 @@ class _TaskDetailPanelState extends State<TaskDetailPanel> {
                           ),
                           const SizedBox(height: 4),
                           DropdownButtonFormField<TaskStatus>(
-                            value: widget.task.status,
+                            initialValue: widget.task.status,
+                            isExpanded: true,
                             decoration: const InputDecoration(
                               contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                             ),
@@ -186,7 +225,8 @@ class _TaskDetailPanelState extends State<TaskDetailPanel> {
                           ),
                           const SizedBox(height: 4),
                           DropdownButtonFormField<TaskPriority>(
-                            value: widget.task.priority,
+                            initialValue: widget.task.priority,
+                            isExpanded: true,
                             decoration: const InputDecoration(
                               contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                             ),
@@ -211,6 +251,47 @@ class _TaskDetailPanelState extends State<TaskDetailPanel> {
                           ),
                         ],
                       ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Assignee & Title Row
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'ATANAN KİŞİ & POZİSYON (ROLE)',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    DropdownButtonFormField<String>(
+                      initialValue: provider.teamMembers.any((m) => m.name == widget.task.assignee)
+                          ? widget.task.assignee
+                          : provider.teamMembers.first.name,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      ),
+                      items: provider.teamMembers.map((member) {
+                        return DropdownMenuItem(
+                          value: member.name,
+                          child: Text(
+                            '${member.name} — [${member.title.label}]',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (newAssignee) {
+                        if (newAssignee != null) {
+                          widget.task.assignee = newAssignee;
+                          provider.updateTask(widget.task);
+                        }
+                      },
                     ),
                   ],
                 ),
@@ -310,6 +391,77 @@ class _TaskDetailPanelState extends State<TaskDetailPanel> {
                     ),
                   );
                 }),
+                // Child Subtasks List (Linked Tasks)
+                Builder(
+                  builder: (context) {
+                    final childTasks = provider.getSubtasksOf(widget.task.id);
+                    if (childTasks.isEmpty) return const SizedBox.shrink();
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 6),
+                        ...childTasks.map((ct) {
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isDark ? AppColors.darkCard : AppColors.lightCard,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Remix.corner_down_right_line, size: 14, color: AppColors.violet),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        ct.title,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          decoration: ct.status == TaskStatus.done ? TextDecoration.lineThrough : null,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${ct.taskKey} • ${ct.status.label} • ${ct.assignee}',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: ct.status.color,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                InkWell(
+                                  onTap: () => provider.selectTask(ct),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: primaryColor.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      'Aç ➔',
+                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: primaryColor),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 6),
                 Row(
                   children: [
                     Expanded(
@@ -324,18 +476,19 @@ class _TaskDetailPanelState extends State<TaskDetailPanel> {
                         onSubmitted: (val) {
                           if (val.trim().isNotEmpty) {
                             provider.addSubTask(widget.task.id, val);
+                            provider.createSubtask(parentTask: widget.task, title: val);
                             _newSubtaskController.clear();
                           }
                         },
                       ),
                     ),
-                    const SizedBox(width: 8),
                     IconButton(
-                      icon: const Icon(Remix.add_circle_fill, color: AppColors.primary, size: 20),
+                      icon: const Icon(Remix.add_line, size: 18),
                       onPressed: () {
-                        if (_newSubtaskController.text.trim().isNotEmpty) {
-                          provider.addSubTask(
-                              widget.task.id, _newSubtaskController.text);
+                        final val = _newSubtaskController.text;
+                        if (val.trim().isNotEmpty) {
+                          provider.addSubTask(widget.task.id, val);
+                          provider.createSubtask(parentTask: widget.task, title: val);
                           _newSubtaskController.clear();
                         }
                       },

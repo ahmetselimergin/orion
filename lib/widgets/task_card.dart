@@ -56,7 +56,38 @@ class TaskCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header: Key & Type Icon & Priority Badge
+              // Subtask Parent Link Badge
+              if (task.isSubtask) ...[
+                Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.violet.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: AppColors.violet.withValues(alpha: 0.3),
+                      width: 0.8,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Remix.corner_down_right_line, size: 10, color: AppColors.violet),
+                      const SizedBox(width: 4),
+                      Text(
+                        '↳ ${task.parentKey ?? "Ana Görev"}',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.violet,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              // Header: Task Key & Priority
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -238,16 +269,32 @@ class TaskCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                       ],
-                      CircleAvatar(
-                        radius: 11,
-                        backgroundColor: primaryColor.withValues(alpha: 0.2),
-                        child: Text(
-                          task.assignee.isNotEmpty ? task.assignee[0].toUpperCase() : 'B',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: primaryColor,
-                          ),
+                      Tooltip(
+                        message: task.assignee,
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 11,
+                              backgroundColor: primaryColor.withValues(alpha: 0.2),
+                              child: Text(
+                                task.assignee.isNotEmpty ? task.assignee[0].toUpperCase() : 'A',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: primaryColor,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              task.assignee.split(' ').first,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],

@@ -89,7 +89,8 @@ enum TaskType {
   task,
   bug,
   feature,
-  improvement;
+  improvement,
+  subtask;
 
   String get label {
     switch (this) {
@@ -101,6 +102,8 @@ enum TaskType {
         return 'Yeni Özellik';
       case TaskType.improvement:
         return 'Geliştirme';
+      case TaskType.subtask:
+        return 'Alt Görev';
     }
   }
 
@@ -114,6 +117,8 @@ enum TaskType {
         return Remix.sparkling_fill;
       case TaskType.improvement:
         return Remix.line_chart_line;
+      case TaskType.subtask:
+        return Remix.corner_down_right_line;
     }
   }
 
@@ -127,6 +132,8 @@ enum TaskType {
         return const Color(0xFF10B981);
       case TaskType.improvement:
         return const Color(0xFF8B5CF6);
+      case TaskType.subtask:
+        return const Color(0xFFA855F7);
     }
   }
 }
@@ -197,6 +204,8 @@ class Task {
   List<SubTask> subtasks;
   List<TaskComment> comments;
   String assignee;
+  String? parentId;
+  String? parentKey;
   DateTime createdAt;
   DateTime updatedAt;
   DateTime? dueDate;
@@ -215,6 +224,8 @@ class Task {
     List<SubTask>? subtasks,
     List<TaskComment>? comments,
     this.assignee = 'Ben',
+    this.parentId,
+    this.parentKey,
     DateTime? createdAt,
     DateTime? updatedAt,
     this.dueDate,
@@ -225,6 +236,8 @@ class Task {
         updatedAt = updatedAt ?? DateTime.now();
 
   String get taskKey => '$projectKey-$taskNumber';
+
+  bool get isSubtask => parentId != null && parentId!.isNotEmpty;
 
   double get subtaskProgress {
     if (subtasks.isEmpty) return 0.0;
@@ -248,6 +261,8 @@ class Task {
         'subtasks': subtasks.map((s) => s.toJson()).toList(),
         'comments': comments.map((c) => c.toJson()).toList(),
         'assignee': assignee,
+        'parentId': parentId,
+        'parentKey': parentKey,
         'createdAt': createdAt.toIso8601String(),
         'updatedAt': updatedAt.toIso8601String(),
         'dueDate': dueDate?.toIso8601String(),
@@ -280,6 +295,8 @@ class Task {
             .map((c) => TaskComment.fromJson(c))
             .toList(),
         assignee: json['assignee'] ?? 'Ben',
+        parentId: json['parentId'],
+        parentKey: json['parentKey'],
         createdAt: DateTime.parse(json['createdAt']),
         updatedAt: DateTime.parse(json['updatedAt']),
         dueDate: json['dueDate'] != null ? DateTime.parse(json['dueDate']) : null,

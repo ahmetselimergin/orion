@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:remixicon/remixicon.dart';
 import '../models/task.dart';
+import '../models/user_profile.dart';
 import '../providers/project_provider.dart';
 import '../theme/app_theme.dart';
 
@@ -200,25 +201,56 @@ class TaskListTable extends StatelessWidget {
                             )
                           : const Text('-', style: TextStyle(color: Colors.grey)),
                     ),
-                    // Assignee
+                    // Assignee & Position Title
                     DataCell(
-                      Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 10,
-                            backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
-                            child: Text(
-                              task.assignee.isNotEmpty ? task.assignee[0].toUpperCase() : 'B',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
+                      Builder(
+                        builder: (context) {
+                          final member = provider.teamMembers.firstWhere(
+                            (m) => m.name == task.assignee,
+                            orElse: () => UserProfile(
+                              id: '0',
+                              name: task.assignee,
+                              email: '',
+                              title: UserTitle.frontendDev,
                             ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(task.assignee, style: const TextStyle(fontSize: 12)),
-                        ],
+                          );
+
+                          return Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 10,
+                                backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                                child: Text(
+                                  task.assignee.isNotEmpty ? task.assignee[0].toUpperCase() : 'A',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(task.assignee, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: AppColors.accent.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: AppColors.accent.withValues(alpha: 0.3), width: 0.5),
+                                ),
+                                child: Text(
+                                  member.title.label,
+                                  style: const TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.accent,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       ),
                     ),
                     // Due Date

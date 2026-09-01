@@ -3,16 +3,29 @@ import 'package:uuid/uuid.dart';
 import '../models/project.dart';
 import '../models/task.dart';
 import '../services/storage_service.dart';
+import '../services/supabase_service.dart';
+
+import '../models/user_profile.dart';
 
 enum AppViewMode { kanban, list, analytics, settings }
 
 class ProjectProvider extends ChangeNotifier {
   final StorageService _storage;
+  final SupabaseService _supabase;
   final Uuid _uuid = const Uuid();
 
   List<Project> _projects = [];
   List<Task> _tasks = [];
   
+  List<UserProfile> _teamMembers = [
+    UserProfile(id: '1', name: 'Ahmet Selim', email: 'ahmet@orion.app', title: UserTitle.frontendDev),
+    UserProfile(id: '2', name: 'Caner Yılmaz', email: 'caner@orion.app', title: UserTitle.backendDev),
+    UserProfile(id: '3', name: 'Zeynep Kaya', email: 'zeynep@orion.app', title: UserTitle.uiUxDesigner),
+    UserProfile(id: '4', name: 'Mert Demir', email: 'mert@orion.app', title: UserTitle.mobileDev),
+    UserProfile(id: '5', name: 'Elif Çelik', email: 'elif@orion.app', title: UserTitle.qaTester),
+    UserProfile(id: '6', name: 'Burak Şahin', email: 'burak@orion.app', title: UserTitle.devOpsEngineer),
+  ];
+
   String? _selectedProjectId;
   Task? _selectedTask;
   AppViewMode _currentViewMode = AppViewMode.kanban;
@@ -26,18 +39,50 @@ class ProjectProvider extends ChangeNotifier {
   TaskType? _filterType;
   String? _filterTag;
 
-  ProjectProvider(this._storage) {
+  bool _isLoggedIn = false;
+  String _currentUserEmail = '';
+
+  ProjectProvider(this._storage, this._supabase) {
+    _isLoggedIn = _storage.isLoggedIn;
+    _currentUserEmail = _storage.currentUserEmail;
     _loadData();
   }
 
   // Getters
   List<Project> get projects => _projects;
   List<Task> get allTasks => _tasks;
+  List<UserProfile> get teamMembers => _teamMembers;
   String? get selectedProjectId => _selectedProjectId;
   Task? get selectedTask => _selectedTask;
   AppViewMode get currentViewMode => _currentViewMode;
   ThemeMode get themeMode => _themeMode;
   bool get isSidebarCollapsed => _isSidebarCollapsed;
+  bool get isLoggedIn => _isLoggedIn;
+  String get currentUserEmail => _currentUserEmail;
+
+  Future<void> login(String emailOrUsername, String password) async {
+    try {
+      final response = await _supabase.signIn(emailOrUsername, password);
+      if (response?.user != null) {
+        _isLoggedIn = true;
+        _currentUserEmail = response?.user?.email ?? emailOrUsername;
+        await _storage.setLoggedIn(true, email: _currentUserEmail);
+        notifyListeners();
+      } else {
+        throw Exception('Giriş başarısız: Kullanıcı doğrulanamadı.');
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> logout() async {
+    await _supabase.signOut();
+    _isLoggedIn = false;
+    _currentUserEmail = '';
+    await _storage.setLoggedIn(false);
+    notifyListeners();
+  }
 
   String get searchQuery => _searchQuery;
   TaskStatus? get filterStatus => _filterStatus;
@@ -88,8 +133,9 @@ class ProjectProvider extends ChangeNotifier {
     }).toList();
   }
 
-  // Actions: Data Initialization
-  void _loadData() {
+  // Actions: Data Initialization & Supabase Sync
+  Future<void> _loadData() async {
+    // 1. Load local storage first for instant UI response
     _projects = _storage.loadProjects();
     _tasks = _storage.loadTasks();
 
@@ -97,6 +143,42 @@ class ProjectProvider extends ChangeNotifier {
       _selectedProjectId = _projects.first.id;
     }
     notifyListeners();
+
+    // 2. Fetch remote Supabase data and sync
+    try {
+      final remoteProjects = await _supabase.fetchProjects();
+      final remoteTasks = await _supabase.fetchTasks();
+      final remoteProfiles = await _supabase.fetchProfiles();
+
+      if (remoteProfiles.isNotEmpty) {
+        _teamMembers = remoteProfiles;
+      }
+
+      if (remoteProjects.isNotEmpty) {
+        _projects = remoteProjects;
+        await _storage.saveProjects(_projects);
+      } else if (_projects.isNotEmpty) {
+        // Initial sync of existing local projects to Supabase
+        for (final p in _projects) {
+          await _supabase.upsertProject(p);
+        }
+      }
+
+      if (remoteTasks.isNotEmpty) {
+        _tasks = remoteTasks;
+        await _storage.saveTasks(_tasks);
+      } else if (_tasks.isNotEmpty) {
+        // Initial sync of existing local tasks to Supabase
+        for (final t in _tasks) {
+          await _supabase.upsertTask(t);
+        }
+      }
+
+      if (_projects.isNotEmpty && _selectedProjectId == null) {
+        _selectedProjectId = _projects.first.id;
+      }
+      notifyListeners();
+    } catch (_) {}
   }
 
   // Navigation & View Actions
@@ -167,6 +249,7 @@ class ProjectProvider extends ChangeNotifier {
     required String key,
     required String description,
     required int colorValue,
+    List<String>? memberNames,
   }) async {
     final newProject = Project(
       id: _uuid.v4(),
@@ -175,11 +258,13 @@ class ProjectProvider extends ChangeNotifier {
       description: description.trim(),
       colorValue: colorValue,
       nextTaskNumber: 1,
+      memberNames: memberNames,
     );
 
     _projects.add(newProject);
     _selectedProjectId = newProject.id;
     await _storage.saveProjects(_projects);
+    await _supabase.upsertProject(newProject);
     notifyListeners();
     return newProject;
   }
@@ -189,6 +274,7 @@ class ProjectProvider extends ChangeNotifier {
     if (index != -1) {
       _projects[index] = project;
       await _storage.saveProjects(_projects);
+      await _supabase.upsertProject(project);
       notifyListeners();
     }
   }
@@ -204,10 +290,15 @@ class ProjectProvider extends ChangeNotifier {
 
     await _storage.saveProjects(_projects);
     await _storage.saveTasks(_tasks);
+    await _supabase.deleteProject(projectId);
     notifyListeners();
   }
 
   // Task CRUD & Status Updates
+  List<Task> getSubtasksOf(String parentId) {
+    return _tasks.where((t) => t.parentId == parentId).toList();
+  }
+
   Future<Task> createTask({
     required String title,
     String description = '',
@@ -216,6 +307,8 @@ class ProjectProvider extends ChangeNotifier {
     TaskType type = TaskType.task,
     List<String>? tags,
     String assignee = 'Ben',
+    String? parentId,
+    String? parentKey,
     DateTime? dueDate,
   }) async {
     final project = selectedProject;
@@ -237,14 +330,33 @@ class ProjectProvider extends ChangeNotifier {
       type: type,
       tags: tags ?? [],
       assignee: assignee,
+      parentId: parentId,
+      parentKey: parentKey,
       dueDate: dueDate,
     );
 
     _tasks.add(newTask);
     _selectedTask = newTask;
     await _storage.saveTasks(_tasks);
+    await _supabase.upsertTask(newTask);
     notifyListeners();
     return newTask;
+  }
+
+  Future<Task> createSubtask({
+    required Task parentTask,
+    required String title,
+    String assignee = 'Ben',
+    TaskPriority priority = TaskPriority.medium,
+  }) async {
+    return createTask(
+      title: title,
+      parentId: parentTask.id,
+      parentKey: parentTask.taskKey,
+      assignee: assignee,
+      priority: priority,
+      type: TaskType.subtask,
+    );
   }
 
   Future<void> updateTask(Task task) async {
@@ -256,6 +368,7 @@ class ProjectProvider extends ChangeNotifier {
         _selectedTask = task;
       }
       await _storage.saveTasks(_tasks);
+      await _supabase.upsertTask(task);
       notifyListeners();
     }
   }
@@ -271,6 +384,7 @@ class ProjectProvider extends ChangeNotifier {
       }
 
       await _storage.saveTasks(_tasks);
+      await _supabase.upsertTask(_tasks[index]);
       notifyListeners();
     }
   }
@@ -281,6 +395,7 @@ class ProjectProvider extends ChangeNotifier {
       _selectedTask = null;
     }
     await _storage.saveTasks(_tasks);
+    await _supabase.deleteTask(taskId);
     notifyListeners();
   }
 

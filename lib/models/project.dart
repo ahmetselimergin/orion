@@ -5,6 +5,7 @@ class Project {
   String description;
   int colorValue;
   int nextTaskNumber;
+  List<String> memberNames;
   DateTime createdAt;
 
   Project({
@@ -14,8 +15,10 @@ class Project {
     this.description = '',
     this.colorValue = 0xFF6366F1, // Indigo default
     this.nextTaskNumber = 1,
+    List<String>? memberNames,
     DateTime? createdAt,
-  }) : createdAt = createdAt ?? DateTime.now();
+  })  : memberNames = memberNames ?? ['Ahmet Selim'],
+        createdAt = createdAt ?? DateTime.now();
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -24,6 +27,7 @@ class Project {
         'description': description,
         'colorValue': colorValue,
         'nextTaskNumber': nextTaskNumber,
+        'memberNames': memberNames,
         'createdAt': createdAt.toIso8601String(),
       };
 
@@ -34,6 +38,7 @@ class Project {
         description: json['description'] ?? '',
         colorValue: json['colorValue'] ?? 0xFF6366F1,
         nextTaskNumber: json['nextTaskNumber'] ?? 1,
+        memberNames: (json['memberNames'] as List?)?.map((e) => e.toString()).toList() ?? ['Ahmet Selim'],
         createdAt: DateTime.parse(json['createdAt']),
       );
 }

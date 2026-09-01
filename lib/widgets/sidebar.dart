@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:remixicon/remixicon.dart';
 import '../providers/project_provider.dart';
 import '../theme/app_theme.dart';
+import 'project_settings_dialog.dart';
 
 class Sidebar extends StatelessWidget {
   final VoidCallback onCreateTaskPressed;
@@ -65,26 +66,19 @@ class Sidebar extends StatelessWidget {
                     children: [
                       Container(
                         padding: const EdgeInsets.all(7),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              primaryColor,
-                              primaryColor.withValues(alpha: 0.75),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: [
-                            BoxShadow(
-                              color: primaryColor.withValues(alpha: 0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Image.asset(
+                            'assets/logo.png',
+                            width: 20,
+                            height: 20,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) => const Icon(
+                              Remix.layout_4_fill,
+                              color: Colors.white,
+                              size: 18,
                             ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Remix.layout_4_fill,
-                          color: Colors.white,
-                          size: 18,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -95,21 +89,12 @@ class Sidebar extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'ORION JIRA',
+                              'ORION',
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 1.0,
                                 color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              'Masaüstü Proje Takibi',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -209,12 +194,31 @@ class Sidebar extends StatelessWidget {
                                 color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                               ),
                             ),
-                            IconButton(
-                              icon: const Icon(Remix.folder_add_line, size: 16),
-                              onPressed: onCreateProjectPressed,
-                              tooltip: 'Yeni Proje Oluştur',
-                              constraints: const BoxConstraints(),
-                              padding: EdgeInsets.zero,
+                            Row(
+                              children: [
+                                if (selectedProject != null) ...[
+                                  IconButton(
+                                    icon: const Icon(Remix.settings_3_line, size: 15),
+                                    onPressed: () {
+                                      showDialog(
+                                        context: context,
+                                        builder: (_) => ProjectSettingsDialog(project: selectedProject),
+                                      );
+                                    },
+                                    tooltip: 'Proje Ayarları & Ekip Üyeleri',
+                                    constraints: const BoxConstraints(),
+                                    padding: EdgeInsets.zero,
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
+                                IconButton(
+                                  icon: const Icon(Remix.folder_add_line, size: 16),
+                                  onPressed: onCreateProjectPressed,
+                                  tooltip: 'Yeni Proje Oluştur',
+                                  constraints: const BoxConstraints(),
+                                  padding: EdgeInsets.zero,
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -372,7 +376,9 @@ class Sidebar extends StatelessWidget {
                         radius: 14,
                         backgroundColor: primaryColor.withValues(alpha: 0.2),
                         child: Text(
-                          'AS',
+                          provider.currentUserEmail.isNotEmpty
+                              ? provider.currentUserEmail[0].toUpperCase()
+                              : 'A',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
@@ -391,43 +397,61 @@ class Sidebar extends StatelessWidget {
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),
+                      const SizedBox(height: 6),
+                      IconButton(
+                        icon: const Icon(Remix.logout_box_r_line, size: 16, color: Colors.redAccent),
+                        onPressed: () => provider.logout(),
+                        tooltip: 'Çıkış Yap',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
                     ],
                   )
                 : Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 14,
-                            backgroundColor: primaryColor.withValues(alpha: 0.2),
-                            child: Text(
-                              'AS',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: primaryColor,
-                              ),
-                            ),
+                      CircleAvatar(
+                        radius: 14,
+                        backgroundColor: primaryColor.withValues(alpha: 0.2),
+                        child: Text(
+                          provider.currentUserEmail.isNotEmpty
+                              ? provider.currentUserEmail[0].toUpperCase()
+                              : 'A',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: primaryColor,
                           ),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Ahmet Selim',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                            ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          provider.currentUserEmail.isNotEmpty ? provider.currentUserEmail : 'Ahmet Selim',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
                           ),
-                        ],
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                       IconButton(
                         icon: Icon(
                           isDark ? Remix.sun_line : Remix.moon_line,
-                          size: 18,
+                          size: 16,
                         ),
                         onPressed: () => provider.toggleTheme(),
                         tooltip: isDark ? 'Aydınlık Mod' : 'Karanlık Mod',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        icon: const Icon(Remix.logout_box_r_line, size: 16, color: Colors.redAccent),
+                        onPressed: () => provider.logout(),
+                        tooltip: 'Çıkış Yap',
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
                       ),
                     ],
                   ),

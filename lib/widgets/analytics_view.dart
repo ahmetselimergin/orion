@@ -85,7 +85,7 @@ class AnalyticsView extends StatelessWidget {
                 height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: AppColors.done.withOpacity(0.12),
+                  color: AppColors.done.withValues(alpha: 0.12),
                   border: Border.all(color: AppColors.done, width: 3),
                 ),
                 child: Center(
@@ -228,7 +228,7 @@ class AnalyticsView extends StatelessWidget {
                                 child: LinearProgressIndicator(
                                   value: pct,
                                   minHeight: 6,
-                                  backgroundColor: Colors.grey.withOpacity(0.2),
+                                  backgroundColor: Colors.grey.withValues(alpha: 0.2),
                                   valueColor: AlwaysStoppedAnimation(priority.color),
                                 ),
                               ),
@@ -296,7 +296,7 @@ class AnalyticsView extends StatelessWidget {
                                 child: LinearProgressIndicator(
                                   value: pct,
                                   minHeight: 6,
-                                  backgroundColor: Colors.grey.withOpacity(0.2),
+                                  backgroundColor: Colors.grey.withValues(alpha: 0.2),
                                   valueColor: AlwaysStoppedAnimation(type.color),
                                 ),
                               ),
