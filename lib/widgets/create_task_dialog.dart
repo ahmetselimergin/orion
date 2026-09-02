@@ -34,6 +34,8 @@ class _CreateTaskDialogState extends State<CreateTaskDialog> {
   @override
   void initState() {
     super.initState();
+    final provider = context.read<ProjectProvider>();
+    _selectedAssignee = provider.currentUserName;
     _titleController = TextEditingController();
     _descController = TextEditingController();
     _tagsController = TextEditingController();

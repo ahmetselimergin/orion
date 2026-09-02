@@ -4,6 +4,7 @@ import 'package:remixicon/remixicon.dart';
 import '../providers/project_provider.dart';
 import '../theme/app_theme.dart';
 import 'project_settings_dialog.dart';
+import 'user_profile_dialog.dart';
 
 class Sidebar extends StatelessWidget {
   final VoidCallback onCreateTaskPressed;
@@ -372,17 +373,29 @@ class Sidebar extends StatelessWidget {
             child: isCollapsed
                 ? Column(
                     children: [
-                      CircleAvatar(
-                        radius: 14,
-                        backgroundColor: primaryColor.withValues(alpha: 0.2),
-                        child: Text(
-                          provider.currentUserEmail.isNotEmpty
-                              ? provider.currentUserEmail[0].toUpperCase()
-                              : 'A',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: primaryColor,
+                      InkWell(
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            builder: (_) => const UserProfileDialog(),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(14),
+                        child: Tooltip(
+                          message: 'Profil & Şifre Değiştir (${provider.currentUserName})',
+                          child: CircleAvatar(
+                            radius: 14,
+                            backgroundColor: primaryColor.withValues(alpha: 0.2),
+                            child: Text(
+                              provider.currentUserName.isNotEmpty
+                                  ? provider.currentUserName[0].toUpperCase()
+                                  : 'U',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: primaryColor,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -409,30 +422,62 @@ class Sidebar extends StatelessWidget {
                   )
                 : Row(
                     children: [
-                      CircleAvatar(
-                        radius: 14,
-                        backgroundColor: primaryColor.withValues(alpha: 0.2),
-                        child: Text(
-                          provider.currentUserEmail.isNotEmpty
-                              ? provider.currentUserEmail[0].toUpperCase()
-                              : 'A',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: primaryColor,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
                       Expanded(
-                        child: Text(
-                          provider.currentUserEmail.isNotEmpty ? provider.currentUserEmail : 'Ahmet Selim',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                        child: InkWell(
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              builder: (_) => const UserProfileDialog(),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 14,
+                                  backgroundColor: primaryColor.withValues(alpha: 0.2),
+                                  child: Text(
+                                    provider.currentUserName.isNotEmpty
+                                        ? provider.currentUserName[0].toUpperCase()
+                                        : 'U',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: primaryColor,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        provider.currentUserName,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Text(
+                                        'Profil & Şifre',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: primaryColor,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       IconButton(

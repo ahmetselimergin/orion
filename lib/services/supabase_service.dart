@@ -17,6 +17,9 @@ class SupabaseService {
   }
 
   SupabaseClient get _client => Supabase.instance.client;
+  User? get currentUser => _client.auth.currentUser;
+  String? get currentUserId => _client.auth.currentUser?.id;
+  String? get currentUserEmail => _client.auth.currentUser?.email;
 
   // --- AUTHENTICATION & PROFILES ---
   Future<AuthResponse?> signIn(String emailOrUsername, String password) async {
@@ -71,6 +74,16 @@ class SupabaseService {
     }
 
     return response;
+  }
+
+  Future<UserResponse> updatePassword(String newPassword) async {
+    return await _client.auth.updateUser(
+      UserAttributes(password: newPassword),
+    );
+  }
+
+  Future<void> resetPassword(String email) async {
+    await _client.auth.resetPasswordForEmail(email.trim());
   }
 
   Future<void> _autoSyncUserProfile(User user, String loginInput) async {
@@ -161,7 +174,25 @@ class SupabaseService {
       await _client.from('projects').upsert(project.toJson());
     } catch (e) {
       if (kDebugMode) {
-        print('Supabase upsertProject Error: $e');
+        print('Supabase upsertProject primary attempt error: $e');
+      }
+      try {
+        // Fallback with base columns if table schema doesn't have ownerId/ownerEmail yet
+        final baseJson = {
+          'id': project.id,
+          'key': project.key,
+          'name': project.name,
+          'description': project.description,
+          'colorValue': project.colorValue,
+          'nextTaskNumber': project.nextTaskNumber,
+          'memberNames': project.memberNames,
+          'createdAt': project.createdAt.toIso8601String(),
+        };
+        await _client.from('projects').upsert(baseJson);
+      } catch (e2) {
+        if (kDebugMode) {
+          print('Supabase upsertProject fallback Error: $e2');
+        }
       }
     }
   }

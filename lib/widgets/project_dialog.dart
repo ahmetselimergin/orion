@@ -32,9 +32,11 @@ class _ProjectDialogState extends State<ProjectDialog> {
   void initState() {
     super.initState();
     _selectedColor = _colorOptions.first;
-    // Default select current user or first team member
+    // Default select current user
     final provider = context.read<ProjectProvider>();
-    if (provider.teamMembers.isNotEmpty) {
+    if (provider.currentUserName.isNotEmpty) {
+      _selectedMembers.add(provider.currentUserName);
+    } else if (provider.teamMembers.isNotEmpty) {
       _selectedMembers.add(provider.teamMembers.first.name);
     }
   }

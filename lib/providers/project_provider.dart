@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../models/project.dart';
@@ -41,6 +42,7 @@ class ProjectProvider extends ChangeNotifier {
 
   bool _isLoggedIn = false;
   String _currentUserEmail = '';
+  bool _isSyncing = false;
 
   ProjectProvider(this._storage, this._supabase) {
     _isLoggedIn = _storage.isLoggedIn;
@@ -59,6 +61,33 @@ class ProjectProvider extends ChangeNotifier {
   bool get isSidebarCollapsed => _isSidebarCollapsed;
   bool get isLoggedIn => _isLoggedIn;
   String get currentUserEmail => _currentUserEmail;
+  String? get currentUserId => _supabase.currentUserId;
+  bool get isSyncing => _isSyncing;
+
+  Future<void> refresh() async {
+    _isSyncing = true;
+    notifyListeners();
+    await _loadData();
+    _isSyncing = false;
+    notifyListeners();
+  }
+
+  String get currentUserName {
+    if (_currentUserEmail.isEmpty) return 'Kullanıcı';
+    // 1. Check if matching profile in teamMembers by email
+    final match = _teamMembers.where((m) => m.email.toLowerCase() == _currentUserEmail.toLowerCase()).firstOrNull;
+    if (match != null && match.name.isNotEmpty) {
+      return match.name;
+    }
+    // 2. Check by email prefix matching username
+    final prefix = _currentUserEmail.split('@').first;
+    final matchByPrefix = _teamMembers.where((m) => m.name.toLowerCase() == prefix.toLowerCase()).firstOrNull;
+    if (matchByPrefix != null) {
+      return matchByPrefix.name;
+    }
+    // 3. Fallback: Capitalize prefix
+    return prefix.isNotEmpty ? '${prefix[0].toUpperCase()}${prefix.substring(1)}' : _currentUserEmail;
+  }
 
   Future<void> login(String emailOrUsername, String password) async {
     try {
@@ -67,6 +96,7 @@ class ProjectProvider extends ChangeNotifier {
         _isLoggedIn = true;
         _currentUserEmail = response?.user?.email ?? emailOrUsername;
         await _storage.setLoggedIn(true, email: _currentUserEmail);
+        await _loadData();
         notifyListeners();
       } else {
         throw Exception('Giriş başarısız: Kullanıcı doğrulanamadı.');
@@ -80,8 +110,20 @@ class ProjectProvider extends ChangeNotifier {
     await _supabase.signOut();
     _isLoggedIn = false;
     _currentUserEmail = '';
+    _projects = [];
+    _tasks = [];
+    _selectedProjectId = null;
+    _selectedTask = null;
     await _storage.setLoggedIn(false);
     notifyListeners();
+  }
+
+  Future<void> updatePassword(String newPassword) async {
+    await _supabase.updatePassword(newPassword);
+  }
+
+  Future<void> resetPassword(String email) async {
+    await _supabase.resetPassword(email);
   }
 
   String get searchQuery => _searchQuery;
@@ -92,10 +134,7 @@ class ProjectProvider extends ChangeNotifier {
 
   Project? get selectedProject {
     if (_selectedProjectId == null) return null;
-    return _projects.firstWhere(
-      (p) => p.id == _selectedProjectId,
-      orElse: () => _projects.first,
-    );
+    return _projects.where((p) => p.id == _selectedProjectId).firstOrNull ?? (_projects.isNotEmpty ? _projects.first : null);
   }
 
   List<Task> get currentProjectTasks {
@@ -135,50 +174,80 @@ class ProjectProvider extends ChangeNotifier {
 
   // Actions: Data Initialization & Supabase Sync
   Future<void> _loadData() async {
-    // 1. Load local storage first for instant UI response
-    _projects = _storage.loadProjects();
-    _tasks = _storage.loadTasks();
+    if (!_isLoggedIn || _currentUserEmail.isEmpty) {
+      _projects = [];
+      _tasks = [];
+      _selectedProjectId = null;
+      _selectedTask = null;
+      notifyListeners();
+      return;
+    }
 
-    if (_projects.isNotEmpty) {
+    // 1. Load local storage cache for this user
+    final localProjects = _storage.loadProjects(userKey: _currentUserEmail);
+    final localTasks = _storage.loadTasks(userKey: _currentUserEmail);
+
+    _projects = localProjects;
+    _tasks = localTasks;
+
+    if (_projects.isNotEmpty && _selectedProjectId == null) {
       _selectedProjectId = _projects.first.id;
     }
     notifyListeners();
 
-    // 2. Fetch remote Supabase data and sync
+    // 2. Fetch remote Supabase data and filter accessible items
     try {
-      final remoteProjects = await _supabase.fetchProjects();
-      final remoteTasks = await _supabase.fetchTasks();
       final remoteProfiles = await _supabase.fetchProfiles();
-
       if (remoteProfiles.isNotEmpty) {
         _teamMembers = remoteProfiles;
       }
 
-      if (remoteProjects.isNotEmpty) {
-        _projects = remoteProjects;
-        await _storage.saveProjects(_projects);
-      } else if (_projects.isNotEmpty) {
-        // Initial sync of existing local projects to Supabase
-        for (final p in _projects) {
-          await _supabase.upsertProject(p);
-        }
+      final remoteProjects = await _supabase.fetchProjects();
+      final remoteTasks = await _supabase.fetchTasks();
+
+      final userId = _supabase.currentUserId;
+      final userName = currentUserName;
+
+      // Filter only projects created by or shared with current user
+      final accessibleProjects = remoteProjects.where((p) {
+        return p.isAccessibleBy(
+          userId: userId,
+          userEmail: _currentUserEmail,
+          userName: userName,
+        );
+      }).toList();
+
+      if (accessibleProjects.isNotEmpty) {
+        _projects = accessibleProjects;
+        final accessibleProjectIds = _projects.map((p) => p.id).toSet();
+        _tasks = remoteTasks.where((t) => accessibleProjectIds.contains(t.projectId)).toList();
+
+        await _storage.saveProjects(_projects, userKey: _currentUserEmail);
+        await _storage.saveTasks(_tasks, userKey: _currentUserEmail);
+      } else if (remoteProjects.isNotEmpty && accessibleProjects.isEmpty) {
+        // Other users have projects, but this user doesn't have access to any yet
+        _projects = [];
+        _tasks = [];
+        _selectedProjectId = null;
+        _selectedTask = null;
+        await _storage.saveProjects([], userKey: _currentUserEmail);
+        await _storage.saveTasks([], userKey: _currentUserEmail);
       }
 
-      if (remoteTasks.isNotEmpty) {
-        _tasks = remoteTasks;
-        await _storage.saveTasks(_tasks);
-      } else if (_tasks.isNotEmpty) {
-        // Initial sync of existing local tasks to Supabase
-        for (final t in _tasks) {
-          await _supabase.upsertTask(t);
+      if (_projects.isNotEmpty) {
+        if (_selectedProjectId == null || !_projects.any((p) => p.id == _selectedProjectId)) {
+          _selectedProjectId = _projects.first.id;
         }
-      }
-
-      if (_projects.isNotEmpty && _selectedProjectId == null) {
-        _selectedProjectId = _projects.first.id;
+      } else {
+        _selectedProjectId = null;
+        _selectedTask = null;
       }
       notifyListeners();
-    } catch (_) {}
+    } catch (e) {
+      if (kDebugMode) {
+        print('ProjectProvider _loadData error: $e');
+      }
+    }
   }
 
   // Navigation & View Actions
@@ -251,6 +320,12 @@ class ProjectProvider extends ChangeNotifier {
     required int colorValue,
     List<String>? memberNames,
   }) async {
+    final members = memberNames != null ? List<String>.from(memberNames) : <String>[];
+    final creator = currentUserName;
+    if (creator.isNotEmpty && !members.contains(creator)) {
+      members.insert(0, creator);
+    }
+
     final newProject = Project(
       id: _uuid.v4(),
       key: key.toUpperCase().trim(),
@@ -258,12 +333,14 @@ class ProjectProvider extends ChangeNotifier {
       description: description.trim(),
       colorValue: colorValue,
       nextTaskNumber: 1,
-      memberNames: memberNames,
+      memberNames: members,
+      ownerId: _supabase.currentUserId ?? '',
+      ownerEmail: _currentUserEmail,
     );
 
     _projects.add(newProject);
     _selectedProjectId = newProject.id;
-    await _storage.saveProjects(_projects);
+    await _storage.saveProjects(_projects, userKey: _currentUserEmail);
     await _supabase.upsertProject(newProject);
     notifyListeners();
     return newProject;
@@ -273,7 +350,7 @@ class ProjectProvider extends ChangeNotifier {
     final index = _projects.indexWhere((p) => p.id == project.id);
     if (index != -1) {
       _projects[index] = project;
-      await _storage.saveProjects(_projects);
+      await _storage.saveProjects(_projects, userKey: _currentUserEmail);
       await _supabase.upsertProject(project);
       notifyListeners();
     }
@@ -288,8 +365,8 @@ class ProjectProvider extends ChangeNotifier {
       _selectedTask = null;
     }
 
-    await _storage.saveProjects(_projects);
-    await _storage.saveTasks(_tasks);
+    await _storage.saveProjects(_projects, userKey: _currentUserEmail);
+    await _storage.saveTasks(_tasks, userKey: _currentUserEmail);
     await _supabase.deleteProject(projectId);
     notifyListeners();
   }
@@ -337,7 +414,7 @@ class ProjectProvider extends ChangeNotifier {
 
     _tasks.add(newTask);
     _selectedTask = newTask;
-    await _storage.saveTasks(_tasks);
+    await _storage.saveTasks(_tasks, userKey: _currentUserEmail);
     await _supabase.upsertTask(newTask);
     notifyListeners();
     return newTask;
@@ -367,7 +444,7 @@ class ProjectProvider extends ChangeNotifier {
       if (_selectedTask?.id == task.id) {
         _selectedTask = task;
       }
-      await _storage.saveTasks(_tasks);
+      await _storage.saveTasks(_tasks, userKey: _currentUserEmail);
       await _supabase.upsertTask(task);
       notifyListeners();
     }
@@ -383,7 +460,7 @@ class ProjectProvider extends ChangeNotifier {
         _selectedTask = _tasks[index];
       }
 
-      await _storage.saveTasks(_tasks);
+      await _storage.saveTasks(_tasks, userKey: _currentUserEmail);
       await _supabase.upsertTask(_tasks[index]);
       notifyListeners();
     }
@@ -394,7 +471,7 @@ class ProjectProvider extends ChangeNotifier {
     if (_selectedTask?.id == taskId) {
       _selectedTask = null;
     }
-    await _storage.saveTasks(_tasks);
+    await _storage.saveTasks(_tasks, userKey: _currentUserEmail);
     await _supabase.deleteTask(taskId);
     notifyListeners();
   }

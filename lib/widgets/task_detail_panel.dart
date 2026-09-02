@@ -608,7 +608,7 @@ class _TaskDetailPanelState extends State<TaskDetailPanel> {
                         ),
                         onSubmitted: (val) {
                           if (val.trim().isNotEmpty) {
-                            provider.addComment(widget.task.id, val);
+                            provider.addComment(widget.task.id, val, author: provider.currentUserName);
                             _newCommentController.clear();
                           }
                         },
@@ -619,7 +619,7 @@ class _TaskDetailPanelState extends State<TaskDetailPanel> {
                       icon: const Icon(Remix.send_plane_fill, size: 16, color: AppColors.primary),
                       onPressed: () {
                         if (_newCommentController.text.trim().isNotEmpty) {
-                          provider.addComment(widget.task.id, _newCommentController.text);
+                          provider.addComment(widget.task.id, _newCommentController.text, author: provider.currentUserName);
                           _newCommentController.clear();
                         }
                       },

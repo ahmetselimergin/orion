@@ -494,6 +494,31 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
                 ],
               ),
             ),
+            const SizedBox(width: 10),
+
+            // Cloud Sync / Refresh Button
+            IconButton(
+              onPressed: provider.isSyncing ? null : () => provider.refresh(),
+              icon: provider.isSyncing
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      Remix.refresh_line,
+                      size: 16,
+                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                    ),
+              tooltip: 'Bulut ile Senkronize Et / Yenile',
+              style: IconButton.styleFrom(
+                backgroundColor: isDark ? AppColors.darkCard : AppColors.lightCard,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  side: BorderSide(color: isDark ? AppColors.darkBorder : Colors.black12),
+                ),
+              ),
+            ),
           ],
         ),
       );
@@ -560,6 +585,61 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   }
 
   Widget _buildMainView(BuildContext context, ProjectProvider provider) {
+    if (provider.projects.isEmpty) {
+      final primaryColor = Theme.of(context).colorScheme.primary;
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+
+      return Center(
+        child: Container(
+          padding: const EdgeInsets.all(32),
+          constraints: const BoxConstraints(maxWidth: 480),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Remix.folder_add_line, size: 36, color: primaryColor),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'Henüz Bir Projeniz Yok',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Görevlerinizi ve ekibinizi yönetmek için ilk projenizi oluşturun veya dahil edildiğiniz projeleri bekleyin.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: AppColors.darkTextSecondary),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: () => _openCreateProjectDialog(context),
+                icon: const Icon(Remix.add_line, size: 16),
+                label: const Text('Yeni Proje Oluştur'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     switch (provider.currentViewMode) {
       case AppViewMode.kanban:
         return KanbanBoard(

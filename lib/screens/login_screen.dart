@@ -55,6 +55,193 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void _showForgotPasswordDialog() {
+    final emailController = TextEditingController(
+      text: _userController.text.contains('@') ? _userController.text.trim() : '',
+    );
+    bool isResetting = false;
+    String? resetError;
+    String? resetSuccess;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final primaryColor = Theme.of(context).colorScheme.primary;
+
+          return Dialog(
+            backgroundColor: AppColors.darkSurface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: primaryColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(Remix.lock_unlock_line, color: primaryColor, size: 20),
+                          ),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'Şifre Sıfırlama',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.darkTextPrimary),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Remix.close_line, size: 18, color: AppColors.darkTextSecondary),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Kayıtlı e-posta adresinizi girin. Supabase üzerinden şifre sıfırlama bağlantısı gönderilecektir.',
+                    style: TextStyle(fontSize: 12, color: AppColors.darkTextSecondary),
+                  ),
+                  const SizedBox(height: 16),
+
+                  if (resetSuccess != null) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.green.withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Remix.checkbox_circle_fill, color: Colors.green, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              resetSuccess!,
+                              style: const TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+
+                  if (resetError != null) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Remix.error_warning_fill, color: Colors.redAccent, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              resetError!,
+                              style: const TextStyle(fontSize: 12, color: Colors.redAccent),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+
+                  TextField(
+                    controller: emailController,
+                    style: const TextStyle(fontSize: 13, color: AppColors.darkTextPrimary),
+                    decoration: InputDecoration(
+                      labelText: 'E-Posta Adresi',
+                      labelStyle: const TextStyle(fontSize: 12, color: AppColors.darkTextSecondary),
+                      prefixIcon: const Icon(Remix.mail_line, size: 16, color: AppColors.darkTextSecondary),
+                      filled: true,
+                      fillColor: AppColors.darkCard,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: AppColors.darkBorder),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('İptal'),
+                      ),
+                      const SizedBox(width: 10),
+                      ElevatedButton(
+                        onPressed: isResetting
+                            ? null
+                            : () async {
+                                final email = emailController.text.trim();
+                                if (email.isEmpty || !email.contains('@')) {
+                                  setDialogState(() {
+                                    resetError = 'Lütfen geçerli bir e-posta adresi girin.';
+                                  });
+                                  return;
+                                }
+
+                                setDialogState(() {
+                                  isResetting = true;
+                                  resetError = null;
+                                  resetSuccess = null;
+                                });
+
+                                try {
+                                  await context.read<ProjectProvider>().resetPassword(email);
+                                  setDialogState(() {
+                                    resetSuccess = 'Sıfırlama bağlantısı e-postanıza gönderildi!';
+                                  });
+                                } catch (e) {
+                                  setDialogState(() {
+                                    resetError = 'İşlem başarısız: $e';
+                                  });
+                                } finally {
+                                  setDialogState(() {
+                                    isResetting = false;
+                                  });
+                                }
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: isResetting
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text('Bağlantı Gönder'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
@@ -290,25 +477,46 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 12),
 
-                      // Remember Me Checkbox Row
+                      // Remember Me & Forgot Password Row
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: Checkbox(
-                              value: _rememberMe,
-                              activeColor: primaryColor,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                              onChanged: (val) {
-                                if (val != null) setState(() => _rememberMe = val);
-                              },
-                            ),
+                          Row(
+                            children: [
+                              SizedBox(
+                                height: 24,
+                                width: 24,
+                                child: Checkbox(
+                                  value: _rememberMe,
+                                  activeColor: primaryColor,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                                  onChanged: (val) {
+                                    if (val != null) setState(() => _rememberMe = val);
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Beni Hatırla',
+                                style: TextStyle(fontSize: 12, color: AppColors.darkTextSecondary),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Beni Hatırla',
-                            style: TextStyle(fontSize: 12, color: AppColors.darkTextSecondary),
+                          TextButton(
+                            onPressed: _showForgotPasswordDialog,
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: Text(
+                              'Şifremi Unuttum?',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: primaryColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ],
                       ),
